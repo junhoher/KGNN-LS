@@ -1,3 +1,4 @@
+import sys
 import argparse
 import numpy as np
 from time import time
@@ -6,69 +7,65 @@ from train import train
 
 np.random.seed(555)
 
-parser = argparse.ArgumentParser()
+
+def add_arg(subject, parser):
+    n_eps = 10 ; s_smp = 16 ; n_dim = 32
+    n_itr = 1  ; s_bch = 65536
+    w_l2r = 1e-7 ; w_lsr = 1.0 ; r_lrn = 2e-2
+
+    if subject == 'movie':
+        pass
+
+    elif subject == 'book':
+        s_smp = 8 ; n_dim = 64
+        n_itr = 2 ; s_bch = 256
+        w_l2r = 2e-5 ; w_lsr = 0.5 ; r_lrn = 2e-4
+
+    elif subject == 'music':
+        s_smp = 8 ; n_dim = 16
+        n_itr = 1 ; s_bch = 128
+        w_l2r = 1e-4 ; w_lsr = 0.1 ; r_lrn = 5e-4
+
+    elif subject == 'restaurant':
+        s_smp = 4 ; n_dim = 8
+        n_itr = 2 ; s_bch =65536
+        w_l2r = 1e-7 ; w_lsr = 0.5 ; r_lrn = 2e-2
+
+    else:
+        print('invalid value for the positional argument!')
+        sys.exit()
+
+    parser.add_argument('--dataset', type=str, default=subject, help='which dataset to use')
+    parser.add_argument('--n_epochs', type=int, default=n_eps, help='the number of epochs')
+    parser.add_argument('--neighbor_sample_size', type=int, default=s_smp, help='the number of neighbors to be sampled')
+    parser.add_argument('--dim', type=int, default=n_dim, help='dimension of user and entity embeddings')
+    parser.add_argument('--n_iter', type=int, default=n_itr, help='number of iterations when computing entity representation')
+    parser.add_argument('--batch_size', type=int, default=s_bch, help='batch size')
+    parser.add_argument('--l2_weight', type=float, default=w_l2r, help='weight of L2 regularization')
+    parser.add_argument('--ls_weight', type=float, default=w_lsr, help='weight of LS regularization')
+    parser.add_argument('--lr', type=float, default=r_lrn, help='learning rate')
 
 
-# movie
-parser.add_argument('--dataset', type=str, default='movie', help='which dataset to use')
-parser.add_argument('--n_epochs', type=int, default=10, help='the number of epochs')
-parser.add_argument('--neighbor_sample_size', type=int, default=16, help='the number of neighbors to be sampled')
-parser.add_argument('--dim', type=int, default=32, help='dimension of user and entity embeddings')
-parser.add_argument('--n_iter', type=int, default=1, help='number of iterations when computing entity representation')
-parser.add_argument('--batch_size', type=int, default=65536, help='batch size')
-parser.add_argument('--l2_weight', type=float, default=1e-7, help='weight of l2 regularization')
-parser.add_argument('--ls_weight', type=float, default=1.0, help='weight of LS regularization')
-parser.add_argument('--lr', type=float, default=2e-2, help='learning rate')
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('subject', type=str, metavar='Area for the Recommendation',
+                        help='which subject for the recommendation ? [movie, book, music, restaurant]')
+    p_arg = parser.parse_args()
+    subject = p_arg.subject
+    add_arg(subject, parser)
+
+    show_loss = False
+    show_time = False
+    show_topk = False
+
+    t = time()
+    args = parser.parse_args()
+    data = load_data(args)
+    train(args, data, show_loss, show_topk)
+
+    if show_time:
+        print('time used: %d s' % (time() - t))
 
 
-'''
-# book
-parser.add_argument('--dataset', type=str, default='book', help='which dataset to use')
-parser.add_argument('--n_epochs', type=int, default=10, help='the number of epochs')
-parser.add_argument('--neighbor_sample_size', type=int, default=8, help='the number of neighbors to be sampled')
-parser.add_argument('--dim', type=int, default=64, help='dimension of user and entity embeddings')
-parser.add_argument('--n_iter', type=int, default=2, help='number of iterations when computing entity representation')
-parser.add_argument('--batch_size', type=int, default=256, help='batch size')
-parser.add_argument('--l2_weight', type=float, default=2e-5, help='weight of l2 regularization')
-parser.add_argument('--ls_weight', type=float, default=0.5, help='weight of LS regularization')
-parser.add_argument('--lr', type=float, default=2e-4, help='learning rate')
-'''
-
-'''
-# music
-parser.add_argument('--dataset', type=str, default='music', help='which dataset to use')
-parser.add_argument('--n_epochs', type=int, default=10, help='the number of epochs')
-parser.add_argument('--neighbor_sample_size', type=int, default=8, help='the number of neighbors to be sampled')
-parser.add_argument('--dim', type=int, default=16, help='dimension of user and entity embeddings')
-parser.add_argument('--n_iter', type=int, default=1, help='number of iterations when computing entity representation')
-parser.add_argument('--batch_size', type=int, default=128, help='batch size')
-parser.add_argument('--l2_weight', type=float, default=1e-4, help='weight of l2 regularization')
-parser.add_argument('--ls_weight', type=float, default=0.1, help='weight of LS regularization')
-parser.add_argument('--lr', type=float, default=5e-4, help='learning rate')
-'''
-
-'''
-# restaurant
-parser.add_argument('--dataset', type=str, default='restaurant', help='which dataset to use')
-parser.add_argument('--n_epochs', type=int, default=10, help='the number of epochs')
-parser.add_argument('--neighbor_sample_size', type=int, default=4, help='the number of neighbors to be sampled')
-parser.add_argument('--dim', type=int, default=8, help='dimension of user and entity embeddings')
-parser.add_argument('--n_iter', type=int, default=2, help='number of iterations when computing entity representation')
-parser.add_argument('--batch_size', type=int, default=65536, help='batch size')
-parser.add_argument('--l2_weight', type=float, default=1e-7, help='weight of l2 regularization')
-parser.add_argument('--ls_weight', type=float, default=0.5, help='weight of LS regularization')
-parser.add_argument('--lr', type=float, default=2e-2, help='learning rate')
-'''
-
-show_loss = False
-show_time = False
-show_topk = False
-
-t = time()
-
-args = parser.parse_args()
-data = load_data(args)
-train(args, data, show_loss, show_topk)
-
-if show_time:
-    print('time used: %d s' % (time() - t))
+if __name__== '__main__':
+    main()
